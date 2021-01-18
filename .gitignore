@@ -1,0 +1,10 @@
+/admitad/admitad/urls.py
+/admitad/admitad/settings.py
+*.csv
+/venv/
+/main.py
+*.cfg
+*.xml
+*.iml
+*.env
+*.txt
