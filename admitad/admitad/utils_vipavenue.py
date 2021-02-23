@@ -4,16 +4,16 @@ from lxml import html
 
 
 def get_item_data(response):
-	result_aft_size = []
-	result_aft_color = []
-	item = dict()
+    result_aft_size = []
+    result_aft_color = []
+    item = dict()
 
-	tree = html.fromstring(response.text)
+    tree = html.fromstring(response.text)
 
-	# Ref_link
-	item['ref'] = response.meta['ref']
+    # Ref_link
+    item['ref'] = response.meta['ref']
 
-	# Site-name
+    # Site-name
     item['site_name'] = get_site_name(tree)
 
     # Breadcrumbs
@@ -34,44 +34,44 @@ def get_item_data(response):
     # Description
     item['description'] = get_description(tree)
 
-	# Country made
-	item['country'] = get_country_made(tree)
+    # Country made
+    item['country'] = get_country_made(tree)
 
-	# Brand
-	item['brand'] = get_brand(tree)
+    # Brand
+    item['brand'] = get_brand(tree)
 
-	# Parameters
-	item['parameters'] = get_params(tree)
+    # Parameters
+    item['parameters'] = get_params(tree)
 
-	if not item['price'] or not item['sku'] or not item['brand']:
-		return []
+    if not item['price'] or not item['sku'] or not item['brand']:
+        return []
 
-	# Items. Sizes and Colors variants
-	# Size
-	size_list = get_size(tree)
-	product_type = ''
-	if size_list:
-		if len(size_list) > 1:
-			product_type = 'variable'
-		for size in size_list:
-			item_size_variant = item.copy()
-			item_size_variant['size'] = str(size).strip()
-			item_size_variant['product_type'] = product_type
-			result_aft_size.append(item_size_variant)
+    # Items. Sizes and Colors variants
+    # Size
+    size_list = get_size(tree)
+    product_type = ''
+    if size_list:
+        if len(size_list) > 1:
+            product_type = 'variable'
+        for size in size_list:
+            item_size_variant = item.copy()
+            item_size_variant['size'] = str(size).strip()
+            item_size_variant['product_type'] = product_type
+            result_aft_size.append(item_size_variant)
     else:
         result_aft_size.append(item)
 
     # Color
     color_list = get_color(tree)
-	if color_list:
-		if len(color_list) > 1:
-			product_type = 'variable'
-		for item_size_variant in result_aft_size:
-			for color in color_list:
-				item_color_variant = item_size_variant.copy()
-				item_color_variant['color'] = str(color).strip()
-				item_color_variant['product_type'] = product_type
-				result_aft_color.append(item_color_variant)
+    if color_list:
+        if len(color_list) > 1:
+            product_type = 'variable'
+        for item_size_variant in result_aft_size:
+            for color in color_list:
+                item_color_variant = item_size_variant.copy()
+                item_color_variant['color'] = str(color).strip()
+                item_color_variant['product_type'] = product_type
+                result_aft_color.append(item_color_variant)
     else:
         result_aft_color = result_aft_size
 
@@ -225,20 +225,20 @@ def get_params(tree):
 
 
 def get_size(tree):
-	sizes_list = tree.xpath('//div[contains(@id, "product")]/@data-ecommercevariant')
-	return set(sizes_list)
-	#
-	# resul_size = []
-	#
-	# if sizes_list:
-	#     for size in set(sizes_list):
-	#         if 'нет' in size:
-	#             continue
-	#         resul_size.append(size.strip())
-	#     # pprint(resul_size)
-	#     return resul_size
-	# else:
-	#     return []
+    sizes_list = tree.xpath('//div[contains(@id, "product")]/@data-ecommercevariant')
+    return set(sizes_list)
+    #
+    # resul_size = []
+    #
+    # if sizes_list:
+    #     for size in set(sizes_list):
+    #         if 'нет' in size:
+    #             continue
+    #         resul_size.append(size.strip())
+    #     # pprint(resul_size)
+    #     return resul_size
+    # else:
+    #     return []
 
 
 def get_color(tree):
