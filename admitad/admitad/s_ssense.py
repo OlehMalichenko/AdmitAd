@@ -1,6 +1,5 @@
 import re
 
-import demjson
 from lxml import html
 
 
@@ -11,9 +10,6 @@ def get_item_data(response):
 
     tree = html.fromstring(response.text)
 
-    # script = get_script_data(tree)
-    # pprint(script)
-    # return script_text
     # Ref_link
     item['ref'] = response.meta['ref']
 
@@ -21,13 +17,10 @@ def get_item_data(response):
     item['site_name'] = get_site_name(tree)
 
     # Breadcrumbs
-    item['category'] = response.meta['category']
+    item['category'] = get_breadcrumbs(tree)
 
     # Name
     item['name'] = get_product_name(tree)
-
-    # Brand
-    item['brand'] = get_brand(tree)
 
     # SKU
     item['sku'] = get_product_sku(tree)
@@ -36,30 +29,27 @@ def get_item_data(response):
     item['img'] = get_product_image(tree)
 
     # Prices
-    item['price'], item['sale_price'] = get_price(tree)
-
-    if not item['name'] and not item['brand'] and not item['sku'] and not item['price']:
-        return []
+    item['price'], item['old_price'] = get_price(tree)
 
     # Description
-    # Parameters
-    # Country made
-    # color tmp
     item['description'] = get_description(tree)
-    item['parameters'] = get_params(tree)
+
+    # Country made
     item['country'] = get_country_made(tree)
+
+    # Brand
+    item['brand'] = get_brand(tree)
+
+    # Parameters
+    item['parameters'] = get_params(tree)
 
     # Items. Sizes and Colors variants
     # Size
     size_list = get_size(tree)
-    product_type = ''
     if size_list:
-        if len(size_list) > 1:
-            product_type = 'variable'
         for size in size_list:
             item_size_variant = item.copy()
             item_size_variant['size'] = str(size).strip()
-            item_size_variant['product_type'] = product_type
             result_aft_size.append(item_size_variant)
     else:
         result_aft_size.append(item)
@@ -67,13 +57,10 @@ def get_item_data(response):
     # Color
     color_list = get_color(tree)
     if color_list:
-        if len(color_list) > 1:
-            product_type = 'variable'
         for item_size_variant in result_aft_size:
-            for col in color_list:
+            for color in color_list:
                 item_color_variant = item_size_variant.copy()
-                item_color_variant['color'] = str(col).strip()
-                item_size_variant['product_type'] = product_type
+                item_color_variant['color'] = str(color).strip()
                 result_aft_color.append(item_color_variant)
     else:
         result_aft_color = result_aft_size
@@ -81,20 +68,8 @@ def get_item_data(response):
     return result_aft_color
 
 
-def get_script_data(tree):
-    try:
-        script_text = tree.xpath('//script[@id="structured-data"]/text()')[0]
-        return demjson.decode(script_text)
-    except:
-        return ''
-
-
 def get_brand(tree):
-    brand_list = tree.xpath('//div[@class="b-product__title"]'
-                            '/a/@title'
-                            '|'
-                            '//div[@class="b-product__title"]'
-                            '/span[@itemprop="brand"]/text()')
+    brand_list = tree.xpath('')
 
     if brand_list:
         return str(brand_list[0]).strip()
@@ -104,13 +79,12 @@ def get_brand(tree):
 
 def get_params(tree):
     params = []
-    detail_list = tree.xpath('//div[@class="params-pane tab-pane-content"]'
-                             '/div')
+    detail_list = tree.xpath('')
     if detail_list:
         for div in detail_list:
-            first_div = div.xpath('./div[1]/text()')
-            second_div = div.xpath('./div[2]/text()')
-            second_div_1 = div.xpath('./div[2]/a/text()')
+            first_div = div.xpath('')
+            second_div = div.xpath('')
+            second_div_1 = div.xpath('')
 
             if first_div:
                 tmp = ''
@@ -175,23 +149,14 @@ def get_size(tree):
 def get_description(tree):
     description_list = tree.xpath('//div[@id="goods_description"]/text()')
     if description_list:
-        return ' '.join([t.strip().replace('\n', '').replace('\xa0', ' ')
-                         for t in description_list
-                         if t])
+        return str(description_list[0]).strip()
     else:
         return ''
 
 
-def _create_float_price(price):
-    try:
-        return float(''.join(re.compile(r'[0-9\\.]').findall(price)))  # <<-- CHECK REG for symbols
-    except:
-        return 0.0
-
-
 def get_price(tree):
-    price = 0.0
-    sale_price = 0.0
+    price = ''
+    old_price = ''
 
     price_list = tree.xpath('//div[@itemprop="offers"]'
                             '/meta[@itemprop="price"]/@content')
@@ -199,15 +164,14 @@ def get_price(tree):
                                 '//div[@class="price-item rub-symbol "]'
                                 '/del/text()')
     if price_list:
-        p = _create_float_price(price_list[0])
+        price = price_list[0]
 
-        if old_price_list:
-            price = _create_float_price(old_price_list[0])
-            sale_price = p
-        else:
-            price = p
+    if old_price_list:
+        old_price_re = re.compile('[0-9]').findall(str(old_price_list[0]))
+        if old_price_re:
+            old_price = int(''.join(old_price_re))
 
-    return price, sale_price
+    return price, old_price
 
 
 def get_product_name(tree):
@@ -224,7 +188,7 @@ def get_product_sku(tree):
     sku = tree.xpath('//div[@class="col-md-6 col-lg-4 b-product"]'
                      '/meta[@itemprop="sku"]/@content')
     if sku:
-        return f'Elits{str(sku[0]).strip()}'
+        return str(sku[0]).strip()
     else:
         return ''
 

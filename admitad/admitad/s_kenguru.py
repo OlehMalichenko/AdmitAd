@@ -21,7 +21,7 @@ def get_item_data(response):
     item['site_name'] = get_site_name(tree)
 
     # Breadcrumbs
-    item['category'] = response.meta['category']
+    item['category'] = get_breadcrumbs(tree)
 
     # Name
     item['name'] = get_product_name(tree)
@@ -46,8 +46,10 @@ def get_item_data(response):
     # Country made
     # color tmp
     item['description'] = get_description(tree)
-    item['parameters'] = get_params(tree)
-    item['country'] = get_country_made(tree)
+    item['parameters'], item['country'], color = get_params(tree)
+
+    if not item['price'] or not item['sku'] or not item['brand']:
+        return []
 
     # Items. Sizes and Colors variants
     # Size
@@ -65,15 +67,15 @@ def get_item_data(response):
         result_aft_size.append(item)
 
     # Color
-    color_list = get_color(tree)
+    color_list = [color]
     if color_list:
         if len(color_list) > 1:
             product_type = 'variable'
         for item_size_variant in result_aft_size:
-            for col in color_list:
+            for color in color_list:
                 item_color_variant = item_size_variant.copy()
-                item_color_variant['color'] = str(col).strip()
-                item_size_variant['product_type'] = product_type
+                item_color_variant['color'] = str(color).strip()
+                item_color_variant['product_type'] = product_type
                 result_aft_color.append(item_color_variant)
     else:
         result_aft_color = result_aft_size
@@ -90,11 +92,8 @@ def get_script_data(tree):
 
 
 def get_brand(tree):
-    brand_list = tree.xpath('//div[@class="b-product__title"]'
-                            '/a/@title'
-                            '|'
-                            '//div[@class="b-product__title"]'
-                            '/span[@itemprop="brand"]/text()')
+    brand_list = tree.xpath('//h1[@itemprop="name"]'
+                            '/a/text()')
 
     if brand_list:
         return str(brand_list[0]).strip()
@@ -103,28 +102,36 @@ def get_brand(tree):
 
 
 def get_params(tree):
-    params = []
-    detail_list = tree.xpath('//div[@class="params-pane tab-pane-content"]'
-                             '/div')
-    if detail_list:
-        for div in detail_list:
-            first_div = div.xpath('./div[1]/text()')
-            second_div = div.xpath('./div[2]/text()')
-            second_div_1 = div.xpath('./div[2]/a/text()')
+    country = ''
+    color = ''
+    param_list = []
 
-            if first_div:
-                tmp = ''
-                if second_div:
-                    tmp = f'{str(first_div[0]).replace(":", "").strip()} : {str(second_div[0]).strip()}'
-                if second_div_1:
-                    tmp = f'{str(first_div[0]).replace(":", "").strip()} : {str(second_div_1[0]).strip()}'
+    # d = tree.xpath('//div[@class="about__menu--title"][contains(text(), "О товаре")]'
+    #                '/following-sibling::div[@class="about__menu--content"]/p')
 
-                if tmp:
-                    params.append(tmp)
-    if params:
-        return ', '.join(params)
+    for p in tree.xpath('//div[@class="about__menu--title"][contains(text(), "О товаре")]'
+                        '/following-sibling::div[@class="about__menu--content"]/p'):
+        try:
+            tlt = p.xpath('./strong/text()')[0].strip()
+            vl = p.xpath('text()')[0].strip()
+
+            par = f'{tlt} {vl}'
+            param_list.append(par)
+
+            if 'цвет' in tlt.lower():
+                color = vl
+
+            if 'страна' in tlt.lower():
+                country = vl
+        except:
+            continue
+
+    if param_list:
+        params = '/'.join(param_list)
     else:
-        return ''
+        params = ''
+
+    return params, country, color
 
 
 def get_country_made(tree):
@@ -163,21 +170,17 @@ def get_color(tree):
 
 
 def get_size(tree):
-    sizes_list = tree.xpath('//div[@id="product-card-select"]'
-                            '//div[@class="b-size-select__pane"]'
-                            '//option[@data-reserv]/text()')
-    if sizes_list:
-        return sizes_list
-    else:
-        return []
+    size_list = tree.xpath('//div[@class="about__size--list"]'
+                           '//a[@class="element__link"]/text()')
+    return [t.strip().replace('\t', '').replace('\n', '')
+            for t in size_list]
 
 
 def get_description(tree):
-    description_list = tree.xpath('//div[@id="goods_description"]/text()')
+    description_list = tree.xpath('//div[@itemprop="description"]/text()'
+                                  '|//div[@itemprop="description"]//*/text()')
     if description_list:
-        return ' '.join([t.strip().replace('\n', '').replace('\xa0', ' ')
-                         for t in description_list
-                         if t])
+        return ' '.join([t.strip() for t in description_list])
     else:
         return ''
 
@@ -193,27 +196,27 @@ def get_price(tree):
     price = 0.0
     sale_price = 0.0
 
-    price_list = tree.xpath('//div[@itemprop="offers"]'
-                            '/meta[@itemprop="price"]/@content')
-    old_price_list = tree.xpath('//div[@itemprop="offers"]'
-                                '//div[@class="price-item rub-symbol "]'
-                                '/del/text()')
-    if price_list:
-        p = _create_float_price(price_list[0])
+    try:
+        price = _create_float_price(tree.xpath('//meta[@itemprop="price"]/@content')[0])
+    except:
+        pass
 
-        if old_price_list:
-            price = _create_float_price(old_price_list[0])
-            sale_price = p
-        else:
-            price = p
+    try:
+        old_price_text = tree.xpath('//span[@class="old-price-value"]'
+                                    '/s/text()')[0]
+        old_price = _create_float_price(old_price_text)
+    except:
+        old_price = 0.0
 
-    return price, sale_price
+    if old_price > price:
+        return old_price, price
+    else:
+        return price, sale_price
 
 
 def get_product_name(tree):
-    name = tree.xpath('//nav[@class="col-12 breadcrumbs"]'
-                      '//li'
-                      '/h1[@itemprop="name"]/text()')
+    name = tree.xpath('//h1[@itemprop="name"]'
+                      '/span/text()')
     if name:
         return str(name[0]).strip()
     else:
@@ -221,46 +224,40 @@ def get_product_name(tree):
 
 
 def get_product_sku(tree):
-    sku = tree.xpath('//div[@class="col-md-6 col-lg-4 b-product"]'
-                     '/meta[@itemprop="sku"]/@content')
-    if sku:
-        return f'Elits{str(sku[0]).strip()}'
-    else:
-        return ''
+    reg2 = re.compile("prodid.*:\s*'(\w+)'")
+    script = tree.xpath(f"//script[contains(text(), 'prodid')]/text()")
+    for scr in script:
+        if reg2.findall(scr):
+            try:
+                return f'Keng{reg2.findall(scr)[0]}'
+            except:
+                continue
+    return ''
 
 
 def get_product_image(tree):
-    img = tree.xpath('//div[@class="col-md-6 col-lg-4 b-product"]'
-                     '/meta[@itemprop="image"]/@content')
-    if img:
-        return str(img[0]).strip()
-    else:
+    try:
+        href = tree.xpath('//div[@class="gallery__photo"]'
+                          '//img/@src')[0]
+        return f'https://www.keng.ru{href}'
+    except:
         return ''
 
 
 def get_site_name(tree):
-    site_name = tree.xpath('//meta[@property="og:site_name"]/@content')
-    if site_name:
-        return site_name[0]
-    else:
-        return ''
+    try:
+        return tree.xpath('')[0]
+    except:
+        return 'Svmoscow.ru'
 
 
 def get_breadcrumbs(tree):
-    b_crumbs = tree.xpath('//nav[@class="col-12 breadcrumbs"]'
-                          '//li'
-                          '/a/text()')
-    try:
-        gender = str(b_crumbs[1]).lower().strip()
-    except:
+    bc_list = tree.xpath('//div[@class="content__top--bc"]'
+                         '/a[@class="bc__link"]/text()')
+    if bc_list:
+        bc_list = [t.strip()
+                   for t in bc_list
+                   if 'главная' not in t.lower() and 'каталог' not in t.lower()]
+        return '/'.join(bc_list)
+    else:
         return ''
-
-    if 'женщ' not in gender and 'муж' not in gender:
-        gender = 'notGender'
-
-    if len(b_crumbs) > 4:
-        return '/'.join([gender.title(), b_crumbs[3], b_crumbs[4]])
-    elif len(b_crumbs) == 4:
-        return '/'.join([gender.title(), b_crumbs[3], b_crumbs[3]])
-    elif len(b_crumbs) == 3:
-        return '/'.join([gender.title(), b_crumbs[2], b_crumbs[2]])

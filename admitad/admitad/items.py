@@ -11,6 +11,7 @@ class AdmitadItem(scrapy.Item):
     img = scrapy.Field()
     price = scrapy.Field()
     old_price = scrapy.Field()
+    sale_price = scrapy.Field()
     sku = scrapy.Field()
     description = scrapy.Field()
     parameters = scrapy.Field()
@@ -21,3 +22,5 @@ class AdmitadItem(scrapy.Item):
     country = scrapy.Field()
     site_name = scrapy.Field()
     ref = scrapy.Field()
+    product_type = scrapy.Field()
+    currency = scrapy.Field()
